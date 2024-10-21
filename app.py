@@ -1,28 +1,86 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import psycopg2
 
 app = Flask(__name__)
 CORS(app)
 
-error_log = []
+# should this be in a separate config file?
+DB_HOST = 'database-1.c3gewq24oruc.us-east-1.rds.amazonaws.com' # our RDS endpoint
+DB_NAME = 'test'
+DB_USER = 'postgres' #master username
+DB_PASS = 'teamthree' #master password
+DB_PORT = '5432'
 
+# Function to get a database connection
+# .connect returns a connection object, which is used below in get_data()
+def get_db_connection():
+    connection = psycopg2.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        port=DB_PORT
+    )
+    return connection
+
+
+# should we delete this/handle / differently?
 @app.route('/')
 def home():
     return "Hello Flask!"
 
-# SDK posts to this route (using array for now; will switch to postgres)
 @app.route('/api/errors', methods=['POST'])
-def log_error():
-    error_data = request.json
-    error_log.append(error_data)
+def get_data():
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
 
-    print('current errors count:', len(error_log));
-    return jsonify({"message": "Error logged successfully", "data": error_data }), 201
+        # Query for fetching data from ErrorLogs, Requests, and Promises tables
+        query = """
+        SELECT
+            e.id, e.name, e.message, e.created_at, e.line_number, e.col_number, e.project_id, e.stack_trace,
+            r.id AS request_id, r.status_code, r.status_message, r.method, r.url,
+            p.id AS promise_id, p.reason
+        FROM error_logs e
+        LEFT JOIN requests r ON e.request_id = r.id
+        LEFT JOIN promises p ON e.promise_id = p.id
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
 
-#react frontend makes get request to this route for error messages
-@app.route('/api/errors', methods=['GET'])
-def get_errors():
-    return jsonify(error_log), 200
+        # Format the results as a list of dictionaries
+        data_log = []
+        for row in rows:
+            error_entry = {
+                "error_id": row[0],
+                "name": row[1],
+                "message": row[2],
+                "created_at": row[3],
+                "line_number": row[4],
+                "col_number": row[5],
+                "project_id": row[6],
+                "stack_trace": row[7],
+                "request": {
+                    "id": row[8],
+                    "status_code": row[9],
+                    "status_message": row[10],
+                    "method": row[11],
+                    "url": row[12]
+                } if row[8] else None,
+                "promise": {
+                    "id": row[13],
+                    "reason": row[14]
+                } if row[13] else None
+            }
+            data_log.append(error_entry)
+
+    except Exception as e:
+        return jsonify({"message": "Failed to fetch data", "error": str(e)}), 500
+
+    return jsonify(data_log), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
