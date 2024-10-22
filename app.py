@@ -30,7 +30,7 @@ def get_db_connection():
 def home():
     return "Hello Flask!"
 
-@app.route('/api/errors', methods=['POST'])
+@app.route('/api/errors', methods=['GET'])
 def get_data():
     try:
         connection = get_db_connection()
