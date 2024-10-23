@@ -1,16 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
 import psycopg2
+import os
 
 app = Flask(__name__)
 CORS(app)
 
 # should this be in a separate config file?
-DB_HOST = 'database-1.c3gewq24oruc.us-east-1.rds.amazonaws.com' # our RDS endpoint
-DB_NAME = 'test'
-DB_USER = 'postgres' #master username
-DB_PASS = 'teamthree' #master password
-DB_PORT = '5432'
+DB_HOST = os.getenv('PGHOST')
+DB_NAME = os.getenv('PGDATABASE')
+DB_USER = os.getenv('PGHUSER')
+DB_PASS = os.getenv('PGHOST')
+DB_PORT = os.getenv('PGPORT')
 
 # Function to get a database connection
 # .connect returns a connection object, which is used below in get_data()
@@ -83,4 +85,4 @@ def get_data():
     return jsonify(data_log), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=8000, debug=False)
